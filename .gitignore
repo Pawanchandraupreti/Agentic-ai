@@ -1,0 +1,29 @@
+# secrets. never remove this line.
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# notebooks
+.ipynb_checkpoints/
+
+# data and artefacts
+chroma_db/
+*.sqlite3
+*.db
+outputs/
+.DS_Store
+
+slides/
+*.pyc
