@@ -30,7 +30,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "https://fit-agent-q6vs.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -74,10 +75,6 @@ def health():
     }
 
 
-# =========================
-# CHAT
-# =========================
-
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
 
@@ -112,10 +109,6 @@ def chat(request: ChatRequest):
     }
 
 
-# =========================
-# CREATE CHAT
-# =========================
-
 @app.post("/chats")
 def create_chat(request: CreateChatRequest):
 
@@ -130,10 +123,6 @@ def create_chat(request: CreateChatRequest):
     }
 
 
-# =========================
-# GET ALL CHATS
-# =========================
-
 @app.get("/chats")
 def chats():
 
@@ -141,10 +130,6 @@ def chats():
         "chats": get_chat_sessions()
     }
 
-
-# =========================
-# GET CHAT MESSAGES
-# =========================
 
 @app.get("/chats/{session_id}")
 def get_chat(session_id: str):
@@ -156,10 +141,6 @@ def get_chat(session_id: str):
         )
     }
 
-
-# =========================
-# UPDATE CHAT TITLE
-# =========================
 
 @app.put("/chats/{session_id}")
 def update_chat(
@@ -177,10 +158,6 @@ def update_chat(
     }
 
 
-# =========================
-# DELETE CHAT
-# =========================
-
 @app.delete("/chats/{session_id}")
 def delete_chat(session_id: str):
 
@@ -192,10 +169,6 @@ def delete_chat(session_id: str):
         "message": "Chat deleted successfully"
     }
 
-
-# =========================
-# CLEAR CHAT MESSAGES
-# =========================
 
 @app.post("/chats/{session_id}/reset")
 def clear_chat(session_id: str):
@@ -209,10 +182,6 @@ def clear_chat(session_id: str):
     }
 
 
-# =========================
-# DELETE ALL CHATS
-# =========================
-
 @app.post("/chats/reset/all")
 def reset_all_chats():
 
@@ -222,10 +191,6 @@ def reset_all_chats():
         "message": "All chats deleted successfully"
     }
 
-
-# =========================
-# WORKOUT HISTORY
-# =========================
 
 @app.get("/history")
 def history():
