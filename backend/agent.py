@@ -7,24 +7,43 @@ from openai import OpenAI
 from .tools import (
     suggest_exercise,
     log_session,
-    get_session_history
+    get_session_history,
+    get_all_exercises
 )
 
 
 load_dotenv()
 
 
-PROVIDER = os.getenv("PROVIDER", "foundry")
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-MODEL = os.getenv("MODEL", "chat-demo")
+PROVIDER = os.getenv(
+    "PROVIDER",
+    "foundry"
+)
+
+AZURE_OPENAI_ENDPOINT = os.getenv(
+    "AZURE_OPENAI_ENDPOINT"
+)
+
+AZURE_OPENAI_API_KEY = os.getenv(
+    "AZURE_OPENAI_API_KEY"
+)
+
+MODEL = os.getenv(
+    "MODEL",
+    "chat-demo"
+)
 
 
 if not AZURE_OPENAI_ENDPOINT:
-    raise ValueError("AZURE_OPENAI_ENDPOINT is missing from .env")
+    raise ValueError(
+        "AZURE_OPENAI_ENDPOINT is missing from .env"
+    )
+
 
 if not AZURE_OPENAI_API_KEY:
-    raise ValueError("AZURE_OPENAI_API_KEY is missing from .env")
+    raise ValueError(
+        "AZURE_OPENAI_API_KEY is missing from .env"
+    )
 
 
 client = OpenAI(
@@ -33,7 +52,10 @@ client = OpenAI(
 )
 
 
-SYSTEM = """
+SUPPORTED_EXERCISES = get_all_exercises()
+
+
+SYSTEM = f"""
 You are FitAgent, an intelligent workout planning assistant.
 
 Your job is to help users plan, complete, and track workouts.
@@ -73,6 +95,12 @@ RECOMMENDATION RULES:
 - If the user asks generally what they should train today,
   choose a sensible workout goal and use suggest_exercise.
 - Consider the user's recent workout history through the tool.
+- NEVER invent an exercise outside the supported exercise list.
+- Only recommend exercises that can be logged by log_session.
+
+SUPPORTED EXERCISES:
+
+{", ".join(SUPPORTED_EXERCISES)}
 
 COMPLETION RULES:
 
@@ -88,12 +116,28 @@ Examples of completion messages:
 "I finished my workout"
 "I just completed that"
 "I completed the workout"
+"done next"
+"finished that"
 
-If the user says "it", "that", or "the workout",
-use the previously recommended exercise from the
-conversation as the completed exercise.
+If the user says "it", "that", "the workout", or similar,
+use the previously recommended exercise from the conversation
+as the completed exercise.
 
 When calling log_session, provide only the exercise name.
+
+IMPORTANT:
+
+If the previously recommended exercise was "Deadlift",
+call log_session with:
+
+Deadlift
+
+If the previously recommended exercise was "Deadlifts",
+normalize it to:
+
+Deadlift
+
+Never send an unsupported exercise name to log_session.
 
 HISTORY RULES:
 
@@ -109,6 +153,22 @@ When the user asks questions such as:
 use get_session_history.
 
 Use the returned database information to answer the user.
+
+GENERAL CONVERSATION:
+
+If the user asks how to perform an exercise, explain:
+
+- Starting position
+- Grip or stance
+- Movement
+- Breathing
+- Common mistakes
+- Beginner-friendly guidance
+
+If the user asks how many reps or sets to do,
+give a reasonable general recommendation.
+
+Do not claim to know the user's exact physical ability.
 
 Be friendly, concise, and encouraging.
 
@@ -135,7 +195,9 @@ TOOL_SCHEMA = [
                             "cardio",
                             "flexibility"
                         ],
-                        "description": "The user's workout goal."
+                        "description": (
+                            "The user's workout goal."
+                        )
                     }
                 },
                 "required": ["goal"]
@@ -148,14 +210,18 @@ TOOL_SCHEMA = [
             "name": "log_session",
             "description": (
                 "Record that the user completed an exercise. "
-                "The exercise must be a supported exercise."
+                "Only supported exercises can be logged."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "exercise": {
                         "type": "string",
-                        "description": "The exercise completed."
+                        "enum": SUPPORTED_EXERCISES,
+                        "description": (
+                            "The exact supported exercise "
+                            "completed by the user."
+                        )
                     }
                 },
                 "required": ["exercise"]
@@ -201,7 +267,21 @@ def run_agent(
     ]
 
     if conversation:
-        messages.extend(conversation)
+
+        for item in conversation:
+
+            role = item.get("role")
+            content = item.get("content")
+
+            if role in [
+                "user",
+                "assistant"
+            ] and content:
+
+                messages.append({
+                    "role": role,
+                    "content": content
+                })
 
     messages.append({
         "role": "user",
@@ -219,10 +299,13 @@ def run_agent(
         message = response.choices[0].message
 
         messages.append(
-            message.model_dump(exclude_none=True)
+            message.model_dump(
+                exclude_none=True
+            )
         )
 
         if not message.tool_calls:
+
             return message.content or ""
 
         for call in message.tool_calls:
@@ -230,9 +313,11 @@ def run_agent(
             name = call.function.name
 
             try:
+
                 args = json.loads(
                     call.function.arguments or "{}"
                 )
+
             except json.JSONDecodeError:
 
                 result = {
@@ -242,7 +327,9 @@ def run_agent(
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.id,
-                    "content": json.dumps(result)
+                    "content": json.dumps(
+                        result
+                    )
                 })
 
                 continue
@@ -250,7 +337,10 @@ def run_agent(
             if name in REGISTRY:
 
                 try:
-                    result = REGISTRY[name](**args)
+
+                    result = REGISTRY[name](
+                        **args
+                    )
 
                 except Exception as e:
 
@@ -263,7 +353,8 @@ def run_agent(
                 result = {
                     "error": (
                         f"Unknown tool '{name}'. "
-                        f"Available tools: {list(REGISTRY)}"
+                        f"Available tools: "
+                        f"{list(REGISTRY)}"
                     )
                 }
 
