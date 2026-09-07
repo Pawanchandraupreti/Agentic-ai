@@ -6,6 +6,11 @@ from .database import (
     init_db,
     get_sessions,
     reset_sessions,
+    create_chat_session,
+    get_chat_sessions,
+    update_chat_title,
+    delete_chat_session,
+    reset_all_chat_sessions,
     save_memory,
     get_memory,
     reset_memory
@@ -17,7 +22,7 @@ from .agent import run_agent
 app = FastAPI(
     title="Workout Planner Agent",
     description="Agentic workout planning API",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 
@@ -45,6 +50,15 @@ class ChatResponse(BaseModel):
     response: str
 
 
+class CreateChatRequest(BaseModel):
+    session_id: str
+    title: str = "New Workout Chat"
+
+
+class UpdateTitleRequest(BaseModel):
+    title: str
+
+
 @app.get("/")
 def root():
     return {
@@ -60,12 +74,20 @@ def health():
     }
 
 
+# =========================
+# CHAT
+# =========================
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
 
+    create_chat_session(
+        request.session_id
+    )
+
     conversation = get_memory(
         request.session_id,
-        limit=20
+        limit=50
     )
 
     response = run_agent(
@@ -90,32 +112,132 @@ def chat(request: ChatRequest):
     }
 
 
+# =========================
+# CREATE CHAT
+# =========================
+
+@app.post("/chats")
+def create_chat(request: CreateChatRequest):
+
+    create_chat_session(
+        request.session_id,
+        request.title
+    )
+
+    return {
+        "message": "Chat created successfully",
+        "session_id": request.session_id
+    }
+
+
+# =========================
+# GET ALL CHATS
+# =========================
+
+@app.get("/chats")
+def chats():
+
+    return {
+        "chats": get_chat_sessions()
+    }
+
+
+# =========================
+# GET CHAT MESSAGES
+# =========================
+
+@app.get("/chats/{session_id}")
+def get_chat(session_id: str):
+
+    return {
+        "session_id": session_id,
+        "messages": get_memory(
+            session_id
+        )
+    }
+
+
+# =========================
+# UPDATE CHAT TITLE
+# =========================
+
+@app.put("/chats/{session_id}")
+def update_chat(
+    session_id: str,
+    request: UpdateTitleRequest
+):
+
+    update_chat_title(
+        session_id,
+        request.title
+    )
+
+    return {
+        "message": "Chat title updated successfully"
+    }
+
+
+# =========================
+# DELETE CHAT
+# =========================
+
+@app.delete("/chats/{session_id}")
+def delete_chat(session_id: str):
+
+    delete_chat_session(
+        session_id
+    )
+
+    return {
+        "message": "Chat deleted successfully"
+    }
+
+
+# =========================
+# CLEAR CHAT MESSAGES
+# =========================
+
+@app.post("/chats/{session_id}/reset")
+def clear_chat(session_id: str):
+
+    reset_memory(
+        session_id
+    )
+
+    return {
+        "message": "Chat history reset successfully"
+    }
+
+
+# =========================
+# DELETE ALL CHATS
+# =========================
+
+@app.post("/chats/reset/all")
+def reset_all_chats():
+
+    reset_all_chat_sessions()
+
+    return {
+        "message": "All chats deleted successfully"
+    }
+
+
+# =========================
+# WORKOUT HISTORY
+# =========================
+
 @app.get("/history")
 def history():
+
     return {
         "history": get_sessions()
     }
 
 
-@app.get("/memory/{session_id}")
-def memory(session_id: str):
-    return {
-        "session_id": session_id,
-        "memory": get_memory(session_id)
-    }
-
-
-@app.post("/memory/{session_id}/reset")
-def clear_memory(session_id: str):
-    reset_memory(session_id)
-
-    return {
-        "message": "Conversation memory reset successfully"
-    }
-
-
 @app.post("/reset")
-def reset():
+def reset_workouts():
+
     reset_sessions()
 
     return {
